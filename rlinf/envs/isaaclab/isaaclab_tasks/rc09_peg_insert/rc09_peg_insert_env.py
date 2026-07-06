@@ -1,4 +1,4 @@
-# Copyright 2025 The RLinf Authors.
+# Copyright 2026 The RLinf Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,12 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .tasks.rc09_peg_insert import IsaaclabRC09PegInsertEnv
-from .tasks.stack_cube import IsaaclabStackCubeEnv
+"""Thin env subclass hook for RC09 peg-insert (logic lives in env cfg)."""
 
-REGISTER_ISAACLAB_ENVS = {
-    "Isaac-Stack-Cube-Franka-IK-Rel-Visuomotor-Rewarded-v0": IsaaclabStackCubeEnv,
-    "Isaac-RC09-PegInsert-Visuomotor-v0": IsaaclabRC09PegInsertEnv,
-}
+from __future__ import annotations
 
-__all__ = [list(REGISTER_ISAACLAB_ENVS.keys())]
+from isaaclab.envs import ManagerBasedRLEnv
+
+from .rc09_peg_insert_env_cfg import RC09PegInsertVisuomotorEnvCfg
+
+
+class RC09PegInsertVisuomotorEnv(ManagerBasedRLEnv):
+    """RC09 peg-insert visuomotor environment."""
+
+    cfg: RC09PegInsertVisuomotorEnvCfg

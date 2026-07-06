@@ -73,6 +73,10 @@ class OpenPi0Config(Pi0Config):
     value_after_vlm: bool = False  # value after vlm, pi05 mode
     value_vlm_mode: str = "mean_token"  # last_token, mean_token, first_token
 
+    # Optional RL Token bridge (LeRobot Stage 1 -> RLinf critic input)
+    use_rl_token: bool = False
+    rl_token_checkpoint: str | None = None
+
     # ===== DSRL-specific parameters =====
     use_dsrl: bool = False  # Enable DSRL algorithm
     dsrl_state_dim: int = 8  # Raw state dimension for DSRL encoders
@@ -153,6 +157,10 @@ class OpenPi0ForRLActionPrediction(PI0Pytorch, BasePolicy):
             proj_width = 1024
         # value head
         if self.config.add_value_head:
+            value_input_dim = proj_width
+            if getattr(self.config, "use_rl_token", False):
+                # RLTokenConfig default embed_dim; matches rlt_bridge after mean pooling.
+                value_input_dim += 2048
             if self.config.config_name in [
                 "pi05_maniskill",
                 "pi05_libero",
@@ -163,7 +171,7 @@ class OpenPi0ForRLActionPrediction(PI0Pytorch, BasePolicy):
                 value_head_hidden_sizes = (512, 256, 128)
             value_head_activation = "relu"
             self.value_head = ValueHead(
-                input_dim=proj_width,
+                input_dim=value_input_dim,
                 hidden_sizes=value_head_hidden_sizes,
                 output_dim=1,
                 activation=value_head_activation,
@@ -172,6 +180,16 @@ class OpenPi0ForRLActionPrediction(PI0Pytorch, BasePolicy):
         self.use_vlm_value = getattr(self.config, "value_after_vlm", False) and getattr(
             self.config, "add_value_head", False
         )
+        self.rl_token_bridge = None
+        if getattr(self.config, "use_rl_token", False):
+            from rlinf.models.embodiment.openpi.rlt_bridge import build_rl_token_bridge
+
+            self.rl_token_bridge = build_rl_token_bridge(
+                {
+                    "use_rl_token": self.config.use_rl_token,
+                    "rl_token_checkpoint": self.config.rl_token_checkpoint,
+                }
+            )
         # noise head for flow-noise
         if self.config.noise_method == "flow_noise":
             self.noise_head = ExploreNoiseNet(
@@ -1025,6 +1043,16 @@ class OpenPi0ForRLActionPrediction(PI0Pytorch, BasePolicy):
         prefix_out_value = prefix_output[:, prefix_mask, :]
         prefix_out_value = prefix_out_value.mean(dim=1, keepdim=False)
         prefix_out_value = prefix_out_value.to(dtype=torch.float32)
+        if self.rl_token_bridge is not None and self.rl_token_bridge.enabled:
+            self.rl_token_bridge._lazy_init(self)
+            if self.rl_token_bridge._rlt_module is not None:
+                rl_token = self.rl_token_bridge._rlt_module.encode(
+                    prefix_output.to(dtype=torch.float32),
+                    None,
+                )
+                prefix_out_value = self.rl_token_bridge.augment_critic_input(
+                    prefix_out_value, rl_token
+                )
         values_vlm = self.value_head(prefix_out_value)[:, 0]
         return values_vlm
 

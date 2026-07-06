@@ -208,28 +208,53 @@ def convert_to_isaaclab_stack_cube_action(
     return action_array
 
 
+def convert_to_isaaclab_rc09_peg_insert_action(
+    action_chunk: dict[str, np.array], chunk_size: int = 1
+) -> np.ndarray:
+    """Convert GR00T action chunk to Isaac Lab RC09 peg-insert format."""
+    action_components = [
+        action_chunk["action.x"][:, :chunk_size],
+        action_chunk["action.y"][:, :chunk_size],
+        action_chunk["action.z"][:, :chunk_size],
+        action_chunk["action.roll"][:, :chunk_size],
+        action_chunk["action.pitch"][:, :chunk_size],
+        action_chunk["action.yaw"][:, :chunk_size],
+        action_chunk["action.gripper"][:, :chunk_size],
+    ]
+    action_array = np.concatenate(action_components, axis=-1)
+    action_array[..., -1] = np.sign(action_array[..., -1])
+    assert action_array.shape[-1] == 7, (
+        f"Expected 7-dim action, got {action_array.shape[-1]}"
+    )
+    return action_array
+
+
 OBS_CONVERSION = {
     "maniskill": convert_maniskill_obs_to_gr00t_format,
     "libero": convert_libero_obs_to_gr00t_format,
     "isaaclab_stack_cube": convert_libero_obs_to_gr00t_format,
+    "isaaclab_rc09_peg_insert": convert_libero_obs_to_gr00t_format,
 }
 
 ACTION_CONVERSION_N1D5 = {
     "libero": convert_to_libero_action_n1d5,
     "maniskill": convert_to_maniskill_action,
     "isaaclab_stack_cube": convert_to_isaaclab_stack_cube_action,
+    "isaaclab_rc09_peg_insert": convert_to_isaaclab_rc09_peg_insert_action,
 }
 
 ACTION_CONVERSION_N1D6 = {
     "libero": convert_to_libero_action_n1d6,
     "maniskill": convert_to_maniskill_action,
     "isaaclab_stack_cube": convert_to_isaaclab_stack_cube_action,
+    "isaaclab_rc09_peg_insert": convert_to_isaaclab_rc09_peg_insert_action,
 }
 
 ACTION_CONVERSION_N1D7 = {
     "libero": convert_to_libero_action_n1d7,
     "maniskill": convert_to_maniskill_action,
     "isaaclab_stack_cube": convert_to_isaaclab_stack_cube_action,
+    "isaaclab_rc09_peg_insert": convert_to_isaaclab_rc09_peg_insert_action,
 }
 
 

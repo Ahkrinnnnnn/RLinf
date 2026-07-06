@@ -1,0 +1,9 @@
+# DEPRECATED — RLT Stage-2 uses TD3+BC (paper §IV-B), not PPO.
+# Use td3_pi05_rlt.yaml instead.
+defaults:
+  - rc09_peg_insert/td3_pi05_rlt
+  - override hydra/job_logging: stdout
+
+runner:
+  logger:
+    experiment_name: "rc09_peg_insert_ppo_pi05_rlt_DEPRECATED_use_td3"

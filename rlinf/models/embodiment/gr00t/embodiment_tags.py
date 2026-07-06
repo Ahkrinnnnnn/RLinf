@@ -34,6 +34,9 @@ class EmbodimentTag(Enum):
     ISAACLAB_FRANKA = "isaaclab_franka"
     """The Isaac Lab Franka dataset."""
 
+    ISAACLAB_RC09 = "isaaclab_rc09"
+    """The Isaac Lab RC09 reach dataset (7-dim EEF, stub for post-training)."""
+
     ROBOCASA_PANDA_OMRON = "robocasa_panda_omron"
     """The RoboCasa Panda robot with omron mobile base."""
 
@@ -72,5 +75,6 @@ EMBODIMENT_TAG_MAPPING = {
     EmbodimentTag.GR1.value: 24,
     EmbodimentTag.MANISKILL_WIDOWX.value: 30,
     EmbodimentTag.ISAACLAB_FRANKA.value: 31,
+    EmbodimentTag.ISAACLAB_RC09.value: 10,
     EmbodimentTag.NEW_EMBODIMENT.value: 10,
 }

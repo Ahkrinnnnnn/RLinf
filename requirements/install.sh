@@ -7,7 +7,7 @@ TARGET=""
 MODEL=""
 ENV_NAME=""
 VENV_DIR=".venv"
-PYTHON_VERSION="3.11.14"
+PYTHON_VERSION="3.12.3"
 LEROBOT_COMMIT="0cf864870cf29f4738d3ade893e6fd13fbd7cdb5"
 TORCH_VERSION=""
 SGLANG_VERSION=""
@@ -119,8 +119,9 @@ Common options:
     --rocm <version>       ROCm version for --platform amd. When unset, auto-detected from the
                            system (/opt/rocm/.info/version, hipconfig, rocminfo). Composes
                            UV_TORCH_BACKEND=rocm<version>. Ignored on other platforms.
-    --python <version>     Python version for the venv (e.g. 3.11.14). Defaults to 3.11.14.
-                           Must be >=3.10. Some envs (behavior, d4rl) require 3.10 and will override this.
+    --python <version>     Python version for the venv (e.g. 3.12.3). Defaults to 3.12.3.
+                           Must be >=3.10. RLT shared-core fork requires >=3.12 (PEP 695).
+                           Some envs (behavior, d4rl) require 3.10 and will override this.
     --use-mirror           Use mirrors for faster downloads.
     --no-root              Avoid system dependency installation for non-root users. Only use this if you are certain system dependencies are already installed.
     --no-flash-attn        Skip flash-attn install. Useful when the host lacks a CUDA build
@@ -128,6 +129,10 @@ Common options:
     --no-apex              Skip apex install. Useful when Megatron-LM is not needed and
                            CUDA toolchain mismatch prevents download apex of the right version.
     --install-rlinf        Install RLinf itself into the python.
+
+Environment variables (optional):
+    LEROBOT_PATH           Path to a local LeRobot fork for RLT shared-core (editable, --no-deps).
+                           If unset, install.sh uses ../lerobot next to the RLinf repo when present.
 EOF
 }
 
@@ -1569,8 +1574,39 @@ install_qwen3_vl_model() {
 }
 
 install_lerobot() {
-    env -u UV_TORCH_BACKEND uv pip install \
-        "git+${GITHUB_PREFIX}https://github.com/huggingface/lerobot.git@${LEROBOT_COMMIT}"
+    # Prefer a local fork (RLT shared core requires py3.12+ and lives in the fork).
+    # Set LEROBOT_PATH explicitly, or rely on the sibling ../lerobot next to the RLinf repo.
+    local repo_root
+    repo_root="$(dirname "$SCRIPT_DIR")"
+    local lerobot_path="${LEROBOT_PATH:-}"
+    if [ -z "$lerobot_path" ] && [ -d "$repo_root/../lerobot" ] && [ -f "$repo_root/../lerobot/pyproject.toml" ]; then
+        lerobot_path="$(cd "$repo_root/../lerobot" && pwd)"
+    fi
+
+    if [ -n "$lerobot_path" ] && [ -d "$lerobot_path" ]; then
+        echo "[install.sh] Installing local LeRobot fork (editable, --no-deps) from: $lerobot_path"
+        uv pip install --no-deps -e "$lerobot_path"
+        install_lerobot_runtime_deps
+    else
+        echo "[install.sh] Installing upstream LeRobot pin @ ${LEROBOT_COMMIT}"
+        env -u UV_TORCH_BACKEND uv pip install \
+            "git+${GITHUB_PREFIX}https://github.com/huggingface/lerobot.git@${LEROBOT_COMMIT}"
+    fi
+}
+
+# Minimal runtime deps for importing the RLT shared core from the local fork.
+# Installed with --no-deps on lerobot to avoid torch>=2.7 pin conflicts with RLinf's torch 2.6.
+install_lerobot_runtime_deps() {
+    uv pip install \
+        "draccus>=0.10,<0.11" \
+        "gymnasium>=1.1.1,<2.0.0" \
+        "av>=15,<16" \
+        "torchvision>=0.21,<0.27" \
+        "opencv-python-headless>=4.9,<4.14" \
+        "Pillow>=10,<13" \
+        "packaging>=24.2,<26.0" \
+        "termcolor>=2.4,<4.0" \
+        "tqdm>=4.66,<5.0"
 }
 
 install_franka_realworld_env() {

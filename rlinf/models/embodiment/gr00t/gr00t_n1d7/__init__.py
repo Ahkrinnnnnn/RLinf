@@ -54,6 +54,7 @@ def get_model(cfg: DictConfig, torch_dtype=torch.bfloat16):
         "libero_panda": EmbodimentTag.LIBERO_PANDA,
         "libero_franka": EmbodimentTag.LIBERO_FRANKA,
         "isaaclab_franka": EmbodimentTag.ISAACLAB_FRANKA,
+        "isaaclab_rc09": EmbodimentTag.ISAACLAB_RC09,
         "maniskill_widowx": EmbodimentTag.MANISKILL_WIDOWX,
         "robocasa_panda_omron": EmbodimentTag.ROBOCASA_PANDA_OMRON,
         "gr1": EmbodimentTag.GR1,

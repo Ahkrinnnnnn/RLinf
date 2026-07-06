@@ -47,6 +47,9 @@ from rlinf.models.embodiment.openpi.dataconfig.gsenv_dataconfig import (
 from rlinf.models.embodiment.openpi.dataconfig.isaaclab_dataconfig import (
     LeRobotIsaacLabStackCubeDataConfig,
 )
+from rlinf.models.embodiment.openpi.dataconfig.isaaclab_rc09_dataconfig import (
+    LeRobotIsaacLabRC09PegInsertDataConfig,
+)
 from rlinf.models.embodiment.openpi.dataconfig.libero_dataconfig import (
     LeRobotLiberoDataConfig,
 )
@@ -397,6 +400,21 @@ _CONFIGS = [
             repo_id="RLinf/IsaacLab-Stack-Cube-Data",
             base_config=DataConfig(prompt_from_task=False),
             assets=AssetsConfig(assets_dir="checkpoints/torch/pi0_isaaclab/assets"),
+        ),
+        weight_loader=weight_loaders.CheckpointWeightLoader(
+            "checkpoints/jax/pi05_base/params"
+        ),
+        pytorch_weight_path="checkpoints/torch/pi05_base",
+    ),
+    TrainConfig(
+        name="pi05_isaaclab_rc09_peg_insert",
+        model=pi0_config.Pi0Config(
+            pi05=True, action_horizon=10, discrete_state_input=False
+        ),
+        data=LeRobotIsaacLabRC09PegInsertDataConfig(
+            repo_id="local/isaaclab_rc09_peg_insert_demos",
+            base_config=DataConfig(prompt_from_task=False),
+            assets=AssetsConfig(assets_dir="checkpoints/torch/pi05_base/assets"),
         ),
         weight_loader=weight_loaders.CheckpointWeightLoader(
             "checkpoints/jax/pi05_base/params"

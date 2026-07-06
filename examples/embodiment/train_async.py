@@ -67,6 +67,13 @@ def main(cfg) -> None:
 
         runner_cls = AsyncPPOEmbodiedRunner
         actor_worker_cls = AsyncPPOEmbodiedFSDPActor
+    elif cfg.algorithm.loss_type == "embodied_rlt_td3":
+        raise NotImplementedError(
+            "algorithm.loss_type=embodied_rlt_td3 (RLT Stage-2 TD3+BC) is configured but "
+            "Ray worker integration is not wired yet. The shared math/networks are ready — "
+            "run: pytest tests/unit_tests/test_rlt_shared_core_conformance.py. "
+            "See rlinf/rlt/ROADMAP.md for the integration plan."
+        )
     else:
         raise ValueError(
             f"Unsupported loss type {cfg.algorithm.loss_type} for async embodied runner"
