@@ -3,6 +3,9 @@
 本文档记录 **路径 1（共享核心）** 已完成部分与 **路径 2（Ray worker 集成）** 的待办项。  
 共享数学与网络已落地并通过 conformance 测试；本文档不重复 README 中的 API 说明。
 
+**upstream merge 后**：官方 RLT 在 `rlinf/algorithms/rlt/` + `loss_type: rlt_ac`（Maniskill 已接线）；  
+LeRobot 桥接在 `rlinf/rlt/` + `RLTokenBridge` + `loss_type: embodied_rlt_td3`（RC09 Phase 2）。
+
 ---
 
 ## 已完成（Phase 1 — 共享核心）

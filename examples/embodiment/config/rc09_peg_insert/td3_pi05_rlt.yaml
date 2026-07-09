@@ -4,15 +4,20 @@
 # utd_ratio=5, replay_stride=2, policy_update_freq=2). Loss math and networks
 # are shared via ``lerobot.rlt.shared`` / ``rlinf.rlt.RLTTD3Driver``.
 #
-# NOTE: Ray worker integration (``embodied_rlt_td3``) is Phase 2 — see
-# ``rlinf/rlt/ROADMAP.md``. Until then, validate the shared core with:
-#   pytest tests/unit_tests/test_rlt_shared_core_conformance.py
+# Dual RLT integration paths (post upstream merge):
+#
+# 1. Official upstream ``rlt_ac`` — Maniskill / realworld (Ray worker wired):
+#    examples/embodiment/config/maniskill_rlt_stage2_ac_mlp.yaml
+#
+# 2. LeRobot bridge ``embodied_rlt_td3`` — RC09 Isaac + lerobot.rlt.shared (Phase 2):
+#    examples/embodiment/config/rc09_peg_insert/td3_pi05_rlt.yaml
+#    Stage-1 ckpt from lerobot-train → policy.base_policy.rl_token_checkpoint
 #
 defaults:
   - rc09_peg_insert/env@env.train
   - rc09_peg_insert/env@env.eval
   - /model/pi0_5@actor.model
-  - training_backend/fsdp@actor.fsdp_config
+  - hybrid_engines/fsdp@actor.fsdp_config
   - weight_syncer/patch_syncer@weight_syncer
   - override hydra/job_logging: stdout
 
