@@ -22,6 +22,8 @@ setup_sim_env() {
     export ISAAC_PATH="${ISAAC_PATH:-/path/to/isaac-sim}"
     export EXP_PATH="${EXP_PATH:-$ISAAC_PATH/apps}"
     export CARB_APP_PATH="${CARB_APP_PATH:-$ISAAC_PATH/kit}"
+    export ISAACLAB_PATH="${ISAACLAB_PATH:-/path/to/IsaacLab}"
+    export RC09_URDF_DIR="${RC09_URDF_DIR:-${REPO_PATH}/../RC09-05_urdf.SLDASM}"
 
     # POLARIS dataset
     export POLARIS_DATA_PATH="${POLARIS_DATA_PATH:-/path/to/dataset/PolaRiS-Hub}"
@@ -47,6 +49,7 @@ infer_benchmark() {
         calvin_*|calvin-* ) echo "calvin" ;;
         roboverse_*|roboverse-* ) echo "roboverse" ;;
         polaris_*|polaris-* ) echo "polaris" ;;
+        rc09_*|isaaclab_*|isaaclab-* ) echo "isaaclab" ;;
         * )
             echo "unknown"
             ;;
@@ -185,6 +188,12 @@ if [ "${BENCHMARK}" = "libero" ]; then
         echo "Evaluation Mode: Standard LIBERO"
     fi
     echo "Using benchmark=${BENCHMARK}, config=${CONFIG_NAME}, ROBOT_PLATFORM=${ROBOT_PLATFORM}"
+elif [ "${BENCHMARK}" = "isaaclab" ]; then
+    echo "Using benchmark=${BENCHMARK}, config=${CONFIG_NAME}"
+    echo "  ISAAC_PATH=${ISAAC_PATH}"
+    echo "  ISAACLAB_PATH=${ISAACLAB_PATH}"
+    echo "  RC09_URDF_DIR=${RC09_URDF_DIR}"
+    echo "Ensure install_rc09_task.sh has been run before eval."
 else
     echo "Using benchmark=${BENCHMARK}, config=${CONFIG_NAME}"
 fi

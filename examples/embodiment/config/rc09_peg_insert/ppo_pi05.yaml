@@ -1,11 +1,13 @@
+# @package _global_
 # PPO RL post-training: LeRobot Pi0.5 checkpoint (no RL Token)
 defaults:
-  - rc09_peg_insert/env@env.train
-  - rc09_peg_insert/env@env.eval
+  - /rc09_peg_insert/env@env.train
+  - /rc09_peg_insert/env@env.eval
   - /model/pi0_5@actor.model
   - /hybrid_engines/fsdp@actor.fsdp_config
   - /weight_syncer/patch_syncer@weight_syncer
-  - override hydra/job_logging: stdout
+  - override /hydra/job_logging: stdout
+  - _self_
 
 hydra:
   run:
@@ -25,13 +27,14 @@ runner:
     log_path: "../results"
     project_name: rlinf
     experiment_name: "rc09_peg_insert_ppo_pi05"
-    logger_backends: ["tensorboard"]
+    logger_backends: ["wandb"]
 
   max_epochs: 1000
   max_steps: -1
   only_eval: False
   val_check_interval: -1
-  save_interval: 100
+  # Disable checkpoint writes (save_interval > 0 enables save).
+  save_interval: -1
   resume_dir: null
   ckpt_path: null
 
@@ -65,15 +68,16 @@ env:
   train:
     rollout_epoch: 2
     total_num_envs: 128
-    max_episode_steps: 256
-    max_steps_per_rollout_epoch: 256
+    # 12s episode @ 60Hz sim, decimation=2 -> 360 env steps (match env_cfg)
+    max_episode_steps: 360
+    max_steps_per_rollout_epoch: 360
     use_fixed_reset_state_ids: True
     seed: 42
   eval:
     rollout_epoch: 1
     total_num_envs: 32
-    max_episode_steps: 256
-    max_steps_per_rollout_epoch: 256
+    max_episode_steps: 360
+    max_steps_per_rollout_epoch: 360
     auto_reset: True
     ignore_terminations: True
     use_fixed_reset_state_ids: True
@@ -89,7 +93,7 @@ rollout:
   enable_offload: True
   pipeline_stage_num: 1
   model:
-    model_path: "../lerobot/outputs/models/pi05_insert_the_blue_tube_all/checkpoints/140000/pretrained_model"
+    model_path: "../lerobot/outputs/models/pi05_insert_the_blue_tube/140000/pretrained_model"
     precision: ${actor.model.precision}
 
 actor:
@@ -100,7 +104,7 @@ actor:
   seed: 42
   enable_offload: False
   model:
-    model_path: "../lerobot/outputs/models/pi05_insert_the_blue_tube_all/checkpoints/140000/pretrained_model"
+    model_path: "../lerobot/outputs/models/pi05_insert_the_blue_tube/140000/pretrained_model"
     model_type: "openpi"
     action_dim: 7
     num_action_chunks: 5

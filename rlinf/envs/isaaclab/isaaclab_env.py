@@ -231,6 +231,21 @@ class IsaaclabBaseEnv(gym.Env):
     def close(self):
         self.env.close()
 
+    def capture_image(self, infos=None):
+        """Capture RGB from the Isaac Lab viewer (viewport), for video recording.
+
+        ``RecordVideo`` prefers this over policy ``main_images`` when present.
+        """
+        img = self.env.render()
+        if img is None:
+            return None
+        if isinstance(img, torch.Tensor):
+            img = img.detach().cpu().numpy()
+        if img.ndim == 3:
+            # Batch dim so RecordVideo treats it as one env frame.
+            img = img[None]
+        return img
+
     def update_reset_state_ids(self):
         """
         No muti task.

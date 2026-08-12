@@ -12,12 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
 from multiprocessing.connection import Connection
 
 import torch
 import torch.multiprocessing as mp
 
-from .utils import CloudpickleWrapper
+from .utils import CloudpickleWrapper, scrub_sys_argv_for_isaac_kit
 
 
 def _torch_worker(
@@ -29,6 +30,21 @@ def _torch_worker(
     reset_idx_queue: mp.Queue,
 ):
     parent_remote.close()
+    # Ray isolates workers with CUDA_VISIBLE_DEVICES; Isaac Kit's carb/RTX stack
+    # frequently segfaults on newStage/createHydraEngine when that env is set.
+    # With a single GPU this is safe; Kit re-enumerates physical devices itself.
+    os.environ.pop("CUDA_VISIBLE_DEVICES", None)
+    os.environ.pop("MUJOCO_EGL_DEVICE_ID", None)
+
+    # Ray EnvGroup workers put raylet/gcs flags on sys.argv; Kit then inherits them
+    # via AppLauncher and GUI mode times out waiting for the viewport.
+    removed = scrub_sys_argv_for_isaac_kit()
+    if removed:
+        print(
+            "[SubProcIsaacLabEnv] Scrubbed Ray argv before AppLauncher: "
+            + " ".join(removed)
+        )
+
     env_fn = env_fn_wrapper.x
     isaac_env, sim_app = env_fn()
     device = isaac_env.device
@@ -59,6 +75,9 @@ def _torch_worker(
                 break
             elif cmd == "device":
                 child_remote.send(isaac_env.device)
+            elif cmd == "render":
+                # Viewer / viewport RGB (OmniverseKit_Persp), not policy cameras.
+                obs_queue.put(isaac_env.render())
             else:
                 child_remote.close()
                 raise NotImplementedError
@@ -116,3 +135,8 @@ class SubProcIsaacLabEnv:
     def device(self):
         self.parent_remote.send("device")
         return self.parent_remote.recv()
+
+    def render(self):
+        """Return Isaac Lab viewport/viewer RGB array from the child process."""
+        self.parent_remote.send("render")
+        return self.obs_queue.get()

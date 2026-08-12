@@ -26,9 +26,9 @@ def get_model(cfg: DictConfig, torch_dtype=None):
     import openpi.shared.download as download
     import openpi.transforms as transforms
     import safetensors
-    from openpi.training import checkpoints as _checkpoints
 
     from rlinf.models.embodiment.openpi.dataconfig import get_openpi_config
+    from rlinf.models.embodiment.openpi.lerobot_norm_stats import maybe_load_norm_stats
     from rlinf.models.embodiment.openpi.openpi_action_model import (
         OpenPi0Config,
         OpenPi0ForRLActionPrediction,
@@ -97,19 +97,14 @@ def get_model(cfg: DictConfig, torch_dtype=None):
     norm_stats_path = (
         data_kwargs.get("norm_stats_path") if data_kwargs is not None else None
     )
-    if norm_stats_path is not None:
+    if data_config.norm_stats is not None:
         norm_stats = data_config.norm_stats
-        if norm_stats is None:
-            norm_dir = pathlib.Path(norm_stats_path).expanduser()
-            if norm_dir.is_file():
-                norm_dir = norm_dir.parent
-            norm_stats = _checkpoints.load_norm_stats(norm_dir.parent, norm_dir.name)
     else:
-        # We are loading the norm stats from the checkpoint instead of the config assets dir to make sure
-        # that the policy is using the same normalization stats as the original training process.
-        if data_config.asset_id is None:
-            raise ValueError("Asset id is required to load norm stats.")
-        norm_stats = _checkpoints.load_norm_stats(checkpoint_dir, data_config.asset_id)
+        norm_stats = maybe_load_norm_stats(
+            pathlib.Path(checkpoint_dir),
+            data_config.asset_id,
+            norm_stats_path,
+        )
     # wrappers
     repack_transforms = transforms.Group()
     default_prompt = None

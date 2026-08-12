@@ -1,25 +1,19 @@
-# RLT Stage-2: TD3 + BC online RL (paper §IV-B) — Pi0.5 + frozen RL Token
+# RLT Stage-2: TD3 + BC (paper §IV-B) — Pi0.5 + frozen RL Token (lerobot checkpoint)
 #
-# Aligns with lerobot ``lerobot-rlt-stage2`` defaults (async actor-learner,
-# utd_ratio=5, replay_stride=2, policy_update_freq=2). Loss math and networks
-# are shared via ``lerobot.rlt.shared`` / ``rlinf.rlt.RLTTD3Driver``.
+# Hyperparameters align with lerobot ``lerobot-rlt-stage2`` (utd_ratio, replay_stride, etc.).
+# Loss math: ``lerobot.rlt.shared`` / ``rlinf.rlt.RLTTD3Driver``.
+# Stage-1 weights: ``use_rl_token`` + ``rl_token_checkpoint`` (lerobot-train output).
+# Ray worker ``embodied_rlt_td3`` integration: see ``rlinf/rlt/ROADMAP.md`` Phase 2.
 #
-# Dual RLT integration paths (post upstream merge):
-#
-# 1. Official upstream ``rlt_ac`` — Maniskill / realworld (Ray worker wired):
-#    examples/embodiment/config/maniskill_rlt_stage2_ac_mlp.yaml
-#
-# 2. LeRobot bridge ``embodied_rlt_td3`` — RC09 Isaac + lerobot.rlt.shared (Phase 2):
-#    examples/embodiment/config/rc09_peg_insert/td3_pi05_rlt.yaml
-#    Stage-1 ckpt from lerobot-train → policy.base_policy.rl_token_checkpoint
-#
+# @package _global_
 defaults:
-  - rc09_peg_insert/env@env.train
-  - rc09_peg_insert/env@env.eval
+  - /rc09_peg_insert/env@env.train
+  - /rc09_peg_insert/env@env.eval
   - /model/pi0_5@actor.model
-  - hybrid_engines/fsdp@actor.fsdp_config
-  - weight_syncer/patch_syncer@weight_syncer
-  - override hydra/job_logging: stdout
+  - /hybrid_engines/fsdp@actor.fsdp_config
+  - /weight_syncer/patch_syncer@weight_syncer
+  - override /hydra/job_logging: stdout
+  - _self_
 
 hydra:
   run:

@@ -14,6 +14,7 @@
 
 """MDP helpers for RC09 peg-insert task."""
 
+from .events import *  # noqa: F403
 from .observations import *  # noqa: F403
 from .rewards import *  # noqa: F403
 from .terminations import *  # noqa: F403

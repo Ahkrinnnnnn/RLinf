@@ -27,7 +27,7 @@ from rlinf.models.embodiment.openpi.policies import isaaclab_rc09_policy
 class LeRobotIsaacLabRC09PegInsertDataConfig(DataConfigFactory):
     """OpenPI data config for RC09 peg-insert fine-tuning."""
 
-    default_prompt: str | None = "Insert the pink rod into the blue tube"
+    default_prompt: str | None = "Insert the blue tube into the purple base"
 
     @override
     def create(
@@ -37,7 +37,7 @@ class LeRobotIsaacLabRC09PegInsertDataConfig(DataConfigFactory):
             inputs=[
                 _transforms.RepackTransform(
                     {
-                        "observation/image": "observation.images.front",
+                        "observation/image": "observation.images.top",
                         "observation/wrist_image": "observation.images.wrist",
                         "observation/state": "observation.state",
                         "actions": "action",

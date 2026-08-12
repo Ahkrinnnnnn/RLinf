@@ -21,12 +21,14 @@ from openpi.models import model as _model
 
 
 def make_isaaclab_rc09_example() -> dict:
-    """Random input example for RC09 peg-insert OpenPI policy."""
+    """Random input example aligned with LeRobot pi05_insert_the_blue_tube SFT (deg, GOT0)."""
     return {
-        "observation/state": np.random.rand(7),
-        "observation/image": np.random.randint(256, size=(256, 256, 3), dtype=np.uint8),
+        "observation/state": np.array(
+            [-5.8, 90.3, -36.5, 36.9, 1.1, -6.5], dtype=np.float32
+        ),
+        "observation/image": np.random.randint(256, size=(480, 640, 3), dtype=np.uint8),
         "observation/wrist_image": np.random.randint(
-            256, size=(256, 256, 3), dtype=np.uint8
+            256, size=(480, 640, 3), dtype=np.uint8
         ),
         "prompt": "Insert the pink rod into the blue tube",
     }
@@ -76,9 +78,10 @@ class IsaacLabRC09Inputs(transforms.DataTransformFn):
 
 @dataclasses.dataclass(frozen=True)
 class IsaacLabRC09Outputs(transforms.DataTransformFn):
-    """Convert OpenPI outputs to RC09 IsaacLab 7-dim EEF actions."""
+    """Convert OpenPI outputs to RC09 LeRobot-format 7D actions (deg + GOT0 gripper).
+
+    Simulation env wrapper converts deg→rad and GOT0→binary before Isaac step.
+    """
 
     def __call__(self, data: dict) -> dict:
-        actions = np.asarray(data["actions"][:, :7])
-        actions[..., -1] = np.sign(actions[..., -1])
-        return {"actions": actions}
+        return {"actions": np.asarray(data["actions"][:, :7])}

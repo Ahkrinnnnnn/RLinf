@@ -20,37 +20,49 @@ import torch
 
 from isaaclab.assets import Articulation
 from isaaclab.managers import SceneEntityCfg
-from isaaclab.sensors import Camera
+from isaaclab.sensors import Camera, FrameTransformer
 
-from ..rc09_robot_cfg import RC09_EE_BODY_NAME, RC09_GRIPPER_JOINTS
+from ..rc09_robot_cfg import RC09_ARM_JOINTS, RC09_GRIPPER_CLOSE_POS, RC09_GRIPPER_JOINTS
 
-TUBE_HEIGHT = 0.06
+
+TUBE_HEIGHT = 0.07  # scene_assets/001 空心圆柱 height
+
+
+def arm_joint_pos(
+    env,
+    robot_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
+) -> torch.Tensor:
+    """6 arm joint positions (rad), matching LeRobot ``j1.pos`` … ``j6.pos``."""
+    robot: Articulation = env.scene[robot_cfg.name]
+    joint_ids = [robot.joint_names.index(name) for name in RC09_ARM_JOINTS]
+    return robot.data.joint_pos[:, joint_ids]
 
 
 def ee_frame_pos(
     env,
     ee_frame_cfg: SceneEntityCfg = SceneEntityCfg("ee_frame"),
 ) -> torch.Tensor:
-    ee_frame: Articulation = env.scene[ee_frame_cfg.name]
-    return ee_frame.data.root_pos_w - env.scene.env_origins
+    ee_frame: FrameTransformer = env.scene[ee_frame_cfg.name]
+    return ee_frame.data.target_pos_w[:, 0, :] - env.scene.env_origins
 
 
 def ee_frame_quat(
     env,
     ee_frame_cfg: SceneEntityCfg = SceneEntityCfg("ee_frame"),
 ) -> torch.Tensor:
-    ee_frame: Articulation = env.scene[ee_frame_cfg.name]
-    return ee_frame.data.root_quat_w
+    ee_frame: FrameTransformer = env.scene[ee_frame_cfg.name]
+    return ee_frame.data.target_quat_w[:, 0, :]
 
 
 def gripper_pos(
     env,
     robot_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
 ) -> torch.Tensor:
+    """Normalized gripper: 0 = open, 1 = fully closed (joint / close stroke)."""
     robot: Articulation = env.scene[robot_cfg.name]
     joint_ids = [robot.joint_names.index(name) for name in RC09_GRIPPER_JOINTS]
     positions = robot.data.joint_pos[:, joint_ids]
-    normalized = positions / 0.03
+    normalized = positions / RC09_GRIPPER_CLOSE_POS
     return normalized.mean(dim=-1, keepdim=True)
 
 

@@ -15,9 +15,52 @@
 """Utils for evaluating policies in Issaaclab simulation environments."""
 
 import pickle
+import sys
 
 import cloudpickle
 import torch
+
+# Ray worker processes inject these into sys.argv. SimulationApp/AppLauncher
+# forwards unknown argv into Kit, which breaks GUI viewport startup.
+_RAY_KIT_ARGV_PREFIXES = (
+    "--node-ip-address",
+    "--node-manager-port",
+    "--object-store-name",
+    "--raylet-name",
+    "--redis-address",
+    "--metrics-agent-port",
+    "--logging-rotate-bytes",
+    "--logging-rotate-backup-count",
+    "--runtime-env-agent-port",
+    "--gcs-address",
+    "--session-name",
+    "--temp-dir",
+    "--webui",
+    "--cluster-id",
+    "--startup-token",
+    "--worker-launch-time-ms",
+    "--node-id",
+    "--runtime-env-hash",
+)
+
+
+def scrub_sys_argv_for_isaac_kit() -> list[str]:
+    """Remove Ray (and similar) CLI args so AppLauncher does not pass them to Kit.
+
+    Returns the removed arguments (for logging).
+    """
+    if not sys.argv:
+        return []
+    kept = [sys.argv[0]]
+    removed: list[str] = []
+    for arg in sys.argv[1:]:
+        if any(arg == p or arg.startswith(f"{p}=") for p in _RAY_KIT_ARGV_PREFIXES):
+            removed.append(arg)
+            continue
+        kept.append(arg)
+    if removed:
+        sys.argv = kept
+    return removed
 
 
 class CloudpickleWrapper:

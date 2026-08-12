@@ -122,7 +122,9 @@ Common options:
     --python <version>     Python version for the venv (e.g. 3.12.3). Defaults to 3.12.3.
                            Must be >=3.10. RLT shared-core fork requires >=3.12 (PEP 695).
                            Some envs (behavior, d4rl) require 3.10 and will override this.
-    --use-mirror           Use mirrors for faster downloads.
+    --use-mirror           Mirror PyPI (Aliyun) and HuggingFace (hf-mirror). GitHub git
+                           clones stay on github.com unless GITHUB_MIRROR=ghfast or
+                           GITHUB_PREFIX is exported (ghfast TLS failures are common).
     --no-root              Avoid system dependency installation for non-root users. Only use this if you are certain system dependencies are already installed.
     --no-flash-attn        Skip flash-attn install. Useful when the host lacks a CUDA build
                            toolchain or when the platform has no flash-attn support (Ascend).
@@ -133,6 +135,13 @@ Common options:
 Environment variables (optional):
     LEROBOT_PATH           Path to a local LeRobot fork for RLT shared-core (editable, --no-deps).
                            If unset, install.sh uses ../lerobot next to the RLinf repo when present.
+    OPENPI_PATH            Path to a local RLinf/openpi checkout (editable). If unset, clones into
+                           \$VENV_DIR/openpi on first install and reuses it thereafter.
+    ISAAC_LAB_PATH         Path to a local RLinf/IsaacLab checkout. If unset, clones into
+                           \$VENV_DIR/isaaclab (shallow). Pre-clone here when github.com is flaky.
+    GITHUB_PREFIX          Prefix for git+https pip installs (e.g. a GitHub mirror). Not set by
+                           --use-mirror; export manually or set GITHUB_MIRROR=ghfast to enable ghfast.
+    GITHUB_MIRROR          When set to "ghfast", --use-mirror also rewrites github.com git clones.
 EOF
 }
 
@@ -837,8 +846,12 @@ setup_mirror() {
         export UV_PYTHON_INSTALL_MIRROR=https://ghfast.top/https://github.com/astral-sh/python-build-standalone/releases/download
         export UV_DEFAULT_INDEX=https://mirrors.aliyun.com/pypi/simple
         export HF_ENDPOINT=https://hf-mirror.com
-        export GITHUB_PREFIX="https://ghfast.top/"
-        git config --global url."${GITHUB_PREFIX}github.com/".insteadOf "https://github.com/"
+        # GitHub git acceleration is opt-in: ghfast TLS/proxy failures are common and
+        # break `uv pip install git+https://ghfast.top/https://github.com/...`.
+        if [ -n "${GITHUB_PREFIX:-}" ] || [ "${GITHUB_MIRROR:-}" = "ghfast" ]; then
+            export GITHUB_PREFIX="${GITHUB_PREFIX:-https://ghfast.top/}"
+            git config --global url."${GITHUB_PREFIX}github.com/".insteadOf "https://github.com/"
+        fi
         trap 'unset_mirror' EXIT INT TERM HUP
     fi
 }
@@ -848,8 +861,10 @@ unset_mirror() {
         unset UV_PYTHON_INSTALL_MIRROR
         unset UV_DEFAULT_INDEX
         unset HF_ENDPOINT
-        git config --global --unset url."${GITHUB_PREFIX}github.com/".insteadOf "https://github.com/" || true
-        unset GITHUB_PREFIX
+        if [ -n "${GITHUB_PREFIX:-}" ]; then
+            git config --global --unset url."${GITHUB_PREFIX}github.com/".insteadOf "https://github.com/" || true
+            unset GITHUB_PREFIX
+        fi
     fi
 }
 
@@ -1058,6 +1073,26 @@ clone_or_reuse_repo() {
     local git_url="$3"
     shift 3
 
+    git_clone_with_retry() {
+        local url="$1"
+        local dest="$2"
+        shift 2
+        local attempt max_attempts=3
+        for attempt in $(seq 1 "$max_attempts"); do
+            if GIT_TERMINAL_PROMPT=0 git clone "$@" "$url" "$dest"; then
+                return 0
+            fi
+            if [ "$attempt" -lt "$max_attempts" ]; then
+                echo "[install.sh] git clone failed (attempt ${attempt}/${max_attempts}); retrying in 5s..." >&2
+                rm -rf "$dest"
+                sleep 5
+            fi
+        done
+        echo "[install.sh] git clone failed after ${max_attempts} attempts: $url" >&2
+        echo "[install.sh] Pre-clone manually and set ${env_var_name}=/path/to/checkout, then re-run install.sh." >&2
+        return 1
+    }
+
     # Read the value of the environment variable safely under `set -u`.
     local env_value
     env_value="$(printenv "$env_var_name" 2>/dev/null || true)"
@@ -1067,14 +1102,14 @@ clone_or_reuse_repo() {
         target_dir="$env_value"
         if [ ! -d "$target_dir" ]; then
             echo "$env_var_name=$target_dir does not exist yet; cloning $git_url into it..." >&2
-            git clone "$@" "$git_url" "$target_dir" >&2
+            git_clone_with_retry "$git_url" "$target_dir" "$@"
         else
             echo "Reusing existing checkout at $env_var_name=$target_dir." >&2
         fi
     else
         target_dir="$default_dir"
         if [ ! -d "$target_dir" ]; then
-            git clone "$@" "$git_url" "$target_dir" >&2
+            git_clone_with_retry "$git_url" "$target_dir" "$@"
         elif [ -d "$target_dir/.git" ]; then
             echo "Checking git repo $target_dir..." >&2
             local git_intact=1
@@ -1084,7 +1119,7 @@ clone_or_reuse_repo() {
             else
                 echo "Git repo $target_dir is corrupted. Re-cloning..." >&2
                 rm -rf "$target_dir"
-                git clone "$@" "$git_url" "$target_dir" >&2
+                git_clone_with_retry "$git_url" "$target_dir" "$@"
             fi
         fi
     fi
@@ -1257,13 +1292,19 @@ install_openvla_oft_model() {
     uv pip uninstall pynvml || true
 }
 
+install_openpi_package() {
+    local openpi_dir
+    openpi_dir=$(clone_or_reuse_repo OPENPI_PATH "$VENV_DIR/openpi" https://github.com/RLinf/openpi --depth 1)
+    uv pip install -e "$openpi_dir"
+}
+
 install_openpi_model() {
     case "$ENV_NAME" in
         behavior)
             PYTHON_VERSION="3.10"
             create_and_sync_venv
             install_common_embodied_deps
-            uv pip install git+${GITHUB_PREFIX}https://github.com/RLinf/openpi
+            install_openpi_package
             install_behavior_env
             uv pip install protobuf==6.33.0
             pushd ~ >/dev/null
@@ -1274,41 +1315,41 @@ install_openpi_model() {
             create_and_sync_venv
             install_common_embodied_deps
             install_${ENV_NAME}_env
-            uv pip install git+${GITHUB_PREFIX}https://github.com/RLinf/openpi
+            install_openpi_package
             install_flash_attn
             ;;
         metaworld)
             create_and_sync_venv
             install_common_embodied_deps
-            uv pip install git+${GITHUB_PREFIX}https://github.com/RLinf/openpi
+            install_openpi_package
             install_flash_attn
             install_metaworld_env
             ;;
         calvin)
             create_and_sync_venv
             install_common_embodied_deps
-            uv pip install git+${GITHUB_PREFIX}https://github.com/RLinf/openpi
+            install_openpi_package
             install_flash_attn
             install_calvin_env
             ;;
         robocasa)
             create_and_sync_venv
             install_common_embodied_deps
-            uv pip install git+${GITHUB_PREFIX}https://github.com/RLinf/openpi
+            install_openpi_package
             install_flash_attn
             install_robocasa_env
             ;;
         robotwin)
             create_and_sync_venv
             install_common_embodied_deps
-            uv pip install git+${GITHUB_PREFIX}https://github.com/RLinf/openpi
+            install_openpi_package
             install_flash_attn
             install_robotwin_env
             ;;
         isaaclab)
             create_and_sync_venv
             install_common_embodied_deps
-            uv pip install git+${GITHUB_PREFIX}https://github.com/RLinf/openpi
+            install_openpi_package
             install_isaaclab_env
             # Torch is modified in Isaac Lab, install flash-attn afterwards
             install_flash_attn
@@ -1317,7 +1358,7 @@ install_openpi_model() {
         roboverse)
             create_and_sync_venv
             install_common_embodied_deps
-            uv pip install git+${GITHUB_PREFIX}https://github.com/RLinf/openpi
+            install_openpi_package
             install_flash_attn
             install_roboverse_env
             ;;
@@ -1329,14 +1370,14 @@ install_openpi_model() {
                 bash $SCRIPT_DIR/embodied/franky_install.sh
             fi
             install_franka_franky_env
-            uv pip install git+${GITHUB_PREFIX}https://github.com/RLinf/openpi
+            install_openpi_package
             install_flash_attn
             ;;
         polaris)
             create_and_sync_venv
             install_common_embodied_deps
             install_polaris_env
-            uv pip install git+${GITHUB_PREFIX}https://github.com/RLinf/openpi
+            install_openpi_package
             ;;
         *)
             echo "Environment '$ENV_NAME' is not supported for OpenPI model." >&2
@@ -1348,14 +1389,25 @@ install_openpi_model() {
     # openpi/orbax require jax.experimental.layout.DeviceLocalLayout (removed in jax>=0.7.0).
     uv pip install -r "$SCRIPT_DIR/embodied/models/openpi.txt"
 
-    # Replace transformers models with OpenPI's modified versions
-    local py_major_minor
+    # Replace transformers models with OpenPI's modified versions.
+    # openpi is installed editable; models_pytorch lives under the source tree, not site-packages.
+    local py_major_minor transformers_replace_dir
     py_major_minor=$(python - <<'EOF'
 import sys
 print(f"{sys.version_info.major}.{sys.version_info.minor}")
 EOF
 )
-    cp -r "$VENV_DIR/lib/python${py_major_minor}/site-packages/openpi/models_pytorch/transformers_replace/"* \
+    transformers_replace_dir=$(python - <<'EOF'
+import pathlib
+import openpi
+
+replace_dir = pathlib.Path(openpi.__file__).resolve().parent / "models_pytorch" / "transformers_replace"
+if not replace_dir.is_dir():
+    raise SystemExit(f"[install.sh] openpi transformers_replace not found at {replace_dir}")
+print(replace_dir)
+EOF
+)
+    cp -r "${transformers_replace_dir}/"* \
         "$VENV_DIR/lib/python${py_major_minor}/site-packages/transformers/"
     
     bash $SCRIPT_DIR/embodied/download_assets.sh --assets openpi
@@ -1907,7 +1959,7 @@ EOF
 
 install_isaaclab_env() {
     local isaaclab_dir
-    isaaclab_dir=$(clone_or_reuse_repo ISAAC_LAB_PATH "$VENV_DIR/isaaclab" https://github.com/RLinf/IsaacLab)
+    isaaclab_dir=$(clone_or_reuse_repo ISAAC_LAB_PATH "$VENV_DIR/isaaclab" https://github.com/RLinf/IsaacLab --depth 1)
 
     pushd ~ >/dev/null
     uv pip install "flatdict==4.0.1" --no-build-isolation
